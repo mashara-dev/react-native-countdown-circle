@@ -70,8 +70,10 @@ function calcInterpolationValuesForHalfCircle2(
 
 function getInitialState(props) {
   const circleProgress = new Animated.Value(0)
+  const circleProgress2 = new Animated.Value(0)
   return {
     circleProgress,
+    circleProgress2,
     secondsElapsed: 0,
     text: props.updateText(0, props.seconds),
     interpolationValuesHalfCircle1: calcInterpolationValuesForHalfCircle1(
@@ -101,7 +103,7 @@ export default class PercentageCircle extends React.PureComponent {
 
   static defaultProps = {
     color: '#f00',
-    shadowColor: '#999',
+    shadowColor: '#fff',
     bgColor: '#e9e9ef',
     borderWidth: 2,
     seconds: 10,
@@ -118,6 +120,7 @@ export default class PercentageCircle extends React.PureComponent {
 
     this.state = getInitialState(props)
     this.restartAnimation()
+    // this.startAnimation()
   }
 
   componentWillReceiveProps(nextProps) {
@@ -128,6 +131,28 @@ export default class PercentageCircle extends React.PureComponent {
       this.setState(getInitialState(nextProps), this.restartAnimation)
     }
   }
+
+  onTextAnimated = ({ finished }) => {
+    // if animation was interrupted by stopAnimation don't restart it.
+    if (!finished) return
+
+    const secondsElapsed = this.state.secondsElapsed + 1
+    const callback = secondsElapsed < this.props.seconds
+      ? this.restartAnimation
+      : this.props.onTimeElapsed
+    const updatedText = this.props.updateText(
+      secondsElapsed,
+      this.props.seconds,
+    )
+    this.setState(
+      {
+        ...getInitialState(this.props),
+        secondsElapsed,
+        text: updatedText,
+      },
+      callback,
+    )
+  };
 
   onCircleAnimated = ({ finished }) => {
     // if animation was interrupted by stopAnimation don't restart it.
@@ -152,13 +177,20 @@ export default class PercentageCircle extends React.PureComponent {
   };
 
   restartAnimation = () => {
-    this.state.circleProgress.stopAnimation()
     Animated.timing(this.state.circleProgress, {
       toValue: 100,
       duration: 1000,
       easing: Easing.linear,
     }).start(this.onCircleAnimated)
   };
+
+  startAnimation = () => {
+    Animated.timing(this.state.circleProgress, {
+      toValue: 100,
+      duration: 13000,
+      easing: Easing.linear,
+    }).start(this.onCircleAnimated)
+  }
 
   renderHalfCircle({ rotate, backgroundColor }) {
     const { radius } = this.props
