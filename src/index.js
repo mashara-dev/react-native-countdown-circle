@@ -9,6 +9,8 @@ import {
 } from 'react-native'
 import PropTypes from 'prop-types'
 
+const SEC_TO_MS = 1000;
+
 // compatability for react-native versions < 0.44
 const ViewPropTypesStyle = ViewPropTypes
   ? ViewPropTypes.style
@@ -70,12 +72,13 @@ function calcInterpolationValuesForHalfCircle2(
 
 function getInitialState(props) {
   const circleProgress = new Animated.Value(0)
-  const circleProgress2 = new Animated.Value(0)
+  const textProgress = new Animated.Value(0)
+
   return {
     circleProgress,
-    circleProgress2,
     secondsElapsed: 0,
     text: props.updateText(0, props.seconds),
+    textProgress,
     interpolationValuesHalfCircle1: calcInterpolationValuesForHalfCircle1(
       circleProgress,
       props,
@@ -99,6 +102,7 @@ export default class PercentageCircle extends React.PureComponent {
     textStyle: Text.propTypes.style,
     updateText: PropTypes.func,
     onTimeElapsed: PropTypes.func,
+    showText: PropTypes.bool,
   };
 
   static defaultProps = {
@@ -113,6 +117,7 @@ export default class PercentageCircle extends React.PureComponent {
     onTimeElapsed: () => null,
     updateText: (elapsedSeconds, totalSeconds) =>
       (totalSeconds - elapsedSeconds).toString(),
+    showText: true,
   };
 
   constructor(props) {
@@ -120,7 +125,7 @@ export default class PercentageCircle extends React.PureComponent {
 
     this.state = getInitialState(props)
     this.restartAnimation()
-    // this.startAnimation()
+    this.restartAnimationCircle()
   }
 
   componentWillReceiveProps(nextProps) {
@@ -128,31 +133,10 @@ export default class PercentageCircle extends React.PureComponent {
       this.props.seconds !== nextProps.seconds
     ) {
       this.state.circleProgress.stopAnimation()
-      this.setState(getInitialState(nextProps), this.restartAnimation)
+      this.state.textProgress.stopAnimation()
+      this.setState(getInitialState(nextProps), this.restartAnimation, this.restartAnimationCircle)
     }
   }
-
-  onTextAnimated = ({ finished }) => {
-    // if animation was interrupted by stopAnimation don't restart it.
-    if (!finished) return
-
-    const secondsElapsed = this.state.secondsElapsed + 1
-    const callback = secondsElapsed < this.props.seconds
-      ? this.restartAnimation
-      : this.props.onTimeElapsed
-    const updatedText = this.props.updateText(
-      secondsElapsed,
-      this.props.seconds,
-    )
-    this.setState(
-      {
-        ...getInitialState(this.props),
-        secondsElapsed,
-        text: updatedText,
-      },
-      callback,
-    )
-  };
 
   onCircleAnimated = ({ finished }) => {
     // if animation was interrupted by stopAnimation don't restart it.
@@ -166,31 +150,26 @@ export default class PercentageCircle extends React.PureComponent {
       secondsElapsed,
       this.props.seconds,
     )
-    this.setState(
-      {
-        ...getInitialState(this.props),
-        secondsElapsed,
-        text: updatedText,
-      },
-      callback,
-    )
+    this.setState({secondsElapsed, text: updatedText }, callback )
   };
 
   restartAnimation = () => {
-    Animated.timing(this.state.circleProgress, {
+    this.state.textProgress.stopAnimation()
+    Animated.timing(this.state.textProgress, {
       toValue: 100,
       duration: 1000,
       easing: Easing.linear,
     }).start(this.onCircleAnimated)
   };
 
-  startAnimation = () => {
+  restartAnimationCircle = () => {
+    this.state.circleProgress.stopAnimation()
     Animated.timing(this.state.circleProgress, {
       toValue: 100,
-      duration: 13000,
+      duration: (this.props.seconds + 1) * SEC_TO_MS,
       easing: Easing.linear,
-    }).start(this.onCircleAnimated)
-  }
+    }).start()
+  };
 
   renderHalfCircle({ rotate, backgroundColor }) {
     const { radius } = this.props
@@ -240,9 +219,11 @@ export default class PercentageCircle extends React.PureComponent {
           },
         ]}
       >
+      {this.props.showText &&
         <Text style={this.props.textStyle}>
           {this.state.text}
         </Text>
+      }
       </View>
     )
   }
